@@ -15,45 +15,63 @@ import rclpy.logging
 import rclpy
 from rclpy.node import Node
 
-from math import sqrt
-from geometry_msgs.msg import Pose
-from std_msgs.msg import Bool
+from geometry_msgs.msg import Twist
 
 
-class Reset_node(Node):
+class Controller(Node):
 
     def __init__(self):
-        super().__init__('reset_node')
+        super().__init__('controller')
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
-        self.subscription = self.create_subscription(Pose,'pose',self.listener_callback, 10)
-        self.publisher_ = self.create_publisher(Bool, 'reset', 10)
+        self.publisher_ = self.create_publisher(Twist, 'cmd_topic', 10)
         timer_period = 1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.pose = Pose()
+        self.N = 1
+        self.counter=0
+        self.output = Twist()
+        self.direction =1
 
-    def listener_callback(self, msg: Pose):
-        self.pose = msg
-        self.get_logger().debug(f'I heard: X={msg.position.x} Y={msg.position.y}')
+    def changeDirection(self):
+        match self.direction:
+            case 1:
+                self.output.linear.x = 1.0
+                self.output.linear.y = 0.0
+            case 2:
+                self.output.linear.x = 0.0
+                self.output.linear.y = 1.0
+            case 3:
+                self.output.linear.x = -1.0
+                self.output.linear.y = 0.0
+            case 0:
+                self.output.linear.x = 0.0
+                self.output.linear.y = -1.0
 
     def timer_callback(self):
-        distance = sqrt((self.pose.position.x**2)+(self.pose.position.y**2))
-        msg = Bool()
-        msg.data = distance>6.0
+        if self.counter == self.N:
+            if self.direction==0:
+                self.N +=1
+            self.counter = 0
+            self.direction = (self.direction+1)%4
+        self.changeDirection()
+        self.counter += 1
+        
+        msg = Twist()
+        msg = self.output
         self.publisher_.publish(msg)
         #self.get_logger().info(f'Publishing: X = {msg.linear.x} Y = {msg.linear.y}')
-        self.get_logger().debug(f'Publishing reset_state: {msg.data}')
+        self.get_logger().debug(f'Publishing: X = {msg.linear.x} Y = {msg.linear.y}')
 
 def main(args=None):
     rclpy.init(args=args)
 
-    reset_node = Reset_node()
+    controller = Controller()
 
-    rclpy.spin(reset_node)
+    rclpy.spin(controller)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    reset_node.destroy_node()
+    controller.destroy_node()
     rclpy.shutdown()
 
 
