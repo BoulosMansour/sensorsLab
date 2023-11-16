@@ -2,7 +2,7 @@ from lab02_interfaces.srv import ComputeTrajectory
 
 import rclpy
 from rclpy.node import Node
-
+from math import atan2,degrees
 from turtlesim.msg import Pose
 
 
@@ -13,11 +13,12 @@ class ComputeTrajectoryService(Node):
         self.srv = self.create_service(ComputeTrajectory, 'compute_trajectory', self.compute_trajectory_callback)
         self.declare_parameter('turtle1/compute_trajectory','initial position')
         self.subscription = self.create_subscription(Pose, 'turtle1/pose', self.listener_callback,10)
-        self.pose = Pose()
+        self.pose = Pose() #actual position 
 
     def compute_trajectory_callback(self, request, response):
         #put your code here
-
+        response.distance = ((self.pose.x-request.x)**2 + (self.pose.y-request.y)**2)**(1/2)
+        response.direction = degrees(atan2((self.pose.y-request.y),(self.pose.x-request.x)))
         return response
     
     def listener_callback(self, msg:Pose):
