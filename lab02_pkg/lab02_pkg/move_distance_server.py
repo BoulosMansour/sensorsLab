@@ -35,6 +35,7 @@ class MoveDistanceActionServer(Node):
         self.cmd_vel_publisher = self.create_publisher(Twist, "cmd_vel", 10, callback_group=self.topic_group)
 
         self.vel = Twist()
+        self.publish = False
 
         publish_period = 0.1 #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
@@ -63,8 +64,9 @@ class MoveDistanceActionServer(Node):
         )
 
     def pub_velocity_callback(self):
-        msg = self.vel
-        self.cmd_vel_publisher.publish(msg)
+            if (self.publish):
+                msg = self.vel
+                self.cmd_vel_publisher.publish(msg)
 
     def pose_callback(self, msg: Pose):
         self.pose = msg
@@ -86,7 +88,9 @@ class MoveDistanceActionServer(Node):
         init_pose = self.pose
         condition = True
         goal = goal_handle.request.distance
+        self.vel.linear.x = 0.5
         start_time = time.time()
+        self.publish =True
         while condition:
             # Execute the control loop at a fixed rate
             passed_distance = sqrt(((self.pose.x-init_pose.x)**2) + ((self.pose.y-init_pose.y)**2))
@@ -106,7 +110,7 @@ class MoveDistanceActionServer(Node):
 
         result.elapsed_time_s = end_time - start_time
         result.traveled_distance = result.elapsed_time_s * 0.5
-        
+        self.publish = False
         return result
 
 
