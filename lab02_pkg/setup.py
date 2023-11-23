@@ -20,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-                'compute_trajectory = lab02_pkg.compute_trajectory:main'
+                'compute_trajectory = lab02_pkg.compute_trajectory:main',
+                'move_distance = lab02_pkg.move_distance_server:main',
+                'goal_generator = lab02_pkg.goal_generator:main'
         ],
     },
 )
