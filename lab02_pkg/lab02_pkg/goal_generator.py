@@ -8,7 +8,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 
 from math import degrees
-
+from random import random, randint
 from action_msgs.msg import GoalStatus
 from lab02_interfaces.srv import ComputeTrajectory
 from turtlesim.action import RotateAbsolute
@@ -105,50 +105,51 @@ async def run(args, loop):
     ################################################################################################
     # YOUR CODE SECTION STARTS HERE
     ################################################################################################
-    goal = [8.0, 2.5, 0.8769]
-    completed_move = False
+    for i in range(20):   
+        goal = [random()*11, random()*11, random()*6.28]
+        completed_move = False
 
-    goal_generator.get_logger().debug("Sending goal: " + str(goal))
+        goal_generator.get_logger().info("Sending goal: " + str(goal))
 
-    # Example of calling a SERVICE using async/await
-    goal_generator.compute_traj_cli.wait_for_service()
-    request = ComputeTrajectory.Request()
-    request.x = goal[0]
-    request.y = goal[1]
-    future = goal_generator.compute_traj_cli.call_async(request)
-    response = await future
-    goal_generator.get_logger().info(f'{response.distance} meters ; {response.direction} radians')
+        # Example of calling a SERVICE using async/await
+        goal_generator.compute_traj_cli.wait_for_service()
+        request = ComputeTrajectory.Request()
+        request.x = goal[0]
+        request.y = goal[1]
+        future = goal_generator.compute_traj_cli.call_async(request)
+        response = await future
+        goal_generator.get_logger().info(f'{response.distance} meters ; {response.direction} radians')
 
-    goal_direction = RotateAbsolute.Goal()
-    goal_direction.theta = response.direction
-    rotate_result, rotate_status = await loop.create_task(
-        goal_generator.send_goal(
-            goal_generator.rotate_absolute_client,
-            goal_direction,
-            goal_generator.rotate_absolute_get_feedback,
-        )
-    )
-
-    goal_distance = MoveDistance.Goal()
-    goal_distance.distance = response.distance
-    move_result, move_status = await loop.create_task(
-        goal_generator.send_goal(
-            goal_generator.move_distance_client,
-            goal_distance,
-            goal_generator.move_distance_get_feedback,    
-        )
-    )
-            
-    # Example of calling the rotate absolute ACTION SERVER using async/await
-    goal_angle = RotateAbsolute.Goal()
-    goal_angle.theta = goal[2]
-    result, status = await loop.create_task(
+        goal_direction = RotateAbsolute.Goal()
+        goal_direction.theta = response.direction
+        rotate_result, rotate_status = await loop.create_task(
             goal_generator.send_goal(
                 goal_generator.rotate_absolute_client,
-            goal_angle,
-            goal_generator.rotate_absolute_get_feedback,
+                goal_direction,
+                goal_generator.rotate_absolute_get_feedback,
             )
-    )
+        )
+
+        goal_distance = MoveDistance.Goal()
+        goal_distance.distance = response.distance
+        move_result, move_status = await loop.create_task(
+            goal_generator.send_goal(
+                goal_generator.move_distance_client,
+                goal_distance,
+                goal_generator.move_distance_get_feedback,    
+            )
+        )
+                
+        # Example of calling the rotate absolute ACTION SERVER using async/await
+        goal_angle = RotateAbsolute.Goal()
+        goal_angle.theta = goal[2]
+        result, status = await loop.create_task(
+                goal_generator.send_goal(
+                    goal_generator.rotate_absolute_client,
+                goal_angle,
+                goal_generator.rotate_absolute_get_feedback,
+                )
+        )
         
     goal_generator.get_logger().info("All goals completed! Shutting down...")
     spin_task.cancel()

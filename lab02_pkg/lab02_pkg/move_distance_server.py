@@ -36,6 +36,7 @@ class MoveDistanceActionServer(Node):
 
         self.vel = Twist()
         self.publish = False
+        self.pose = Pose()
 
         publish_period = 0.1 #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
