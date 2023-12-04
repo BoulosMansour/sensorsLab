@@ -1,8 +1,0 @@
-# Request
-float64 x
-float64 y
-int16 angle
----
-# Response
-int16 angle 0
-int8 step 0
