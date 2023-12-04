@@ -23,7 +23,8 @@ setup(
                 'compute_trajectory = lab03_pkg.compute_trajectory:main',
                 'move_forward = lab03_pkg.move_forward:main',
                 'rotate_absolute = lab03_pkg.rotate_absolute:main',
-                'goal_generator = lab03_pkg.goal_generator:main'
+                'goal_generator = lab03_pkg.goal_generator:main',
+                'start_trajectory = lab03_pkg.start_trajectory:main'
         ],
     },
 )

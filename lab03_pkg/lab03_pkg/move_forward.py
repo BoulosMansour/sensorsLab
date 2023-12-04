@@ -40,7 +40,10 @@ class MoveForwardActionServer(Node):
         self.vel = Twist()
         self.condition = False
 
-        publish_period = 0.1 #seconds
+        #parameters
+        self.linear_vel = 0.22
+
+        publish_period = 0.01 #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
 
         # The action server must be in a different callback group since it is blocking.
@@ -72,13 +75,19 @@ class MoveForwardActionServer(Node):
             self.cmd_vel_publisher.publish(msg)
 
     def scan_callback(self, msg: LaserScan):
-        self.scan = msg.ranges[0]
+        self.scan = [msg.ranges[359],msg.ranges[0],msg.ranges[1]]
 
     def pose_callback(self, msg: Odometry):
         self.pose = msg.pose.pose.position
         quat = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w]
         _,_,self.yaw = euler_from_quaternion(quat)
         
+    def will_hit_callback(self): #trigger stop function
+        warnings = 0
+        for i in self.scan:
+            if i<1.0:
+                warnings+=1
+        return warnings>=2
 
     def execute_action_callback(self, goal_handle: ServerGoalHandle):
         '''
@@ -94,7 +103,8 @@ class MoveForwardActionServer(Node):
 
         # Create a condition to break the control loop, it should be updated at each iteration
         goal = goal_handle.request
-        self.vel.linear.x = 0.22
+        self.vel.linear.x = self.linear_vel
+        self.get_logger().info(f'step: {goal.step}')
         start_time = time.time()
         self.condition=True
         while self.condition:
@@ -102,15 +112,15 @@ class MoveForwardActionServer(Node):
             dist_x = abs(goal.x-self.pose.x)
             dist_y = abs(goal.y-self.pose.y)
             if (dist_x<0.5 and dist_y<0.5
-                or goal.step == 1 and (dist_x<0.5 or dist_y<0.5)
-                or goal.step == 2 and dist_y<0.5
-                or goal.step == 3 and dist_x<0.5):
+                or goal.step == 1 and (dist_x<0.7 or dist_y<0.7)
+                or goal.step == 2 and dist_y<0.7
+                or goal.step == 3 and dist_x<0.7):
 
                 self.vel.linear.x = 0.0
                 self.condition = False
                 self.cmd_vel_publisher.publish(self.vel)
             
-            if self.scan < 1:
+            if self.will_hit_callback():
                 self.vel.linear.x=0.0
                 self.condition = False
                 self.cmd_vel_publisher.publish(self.vel)

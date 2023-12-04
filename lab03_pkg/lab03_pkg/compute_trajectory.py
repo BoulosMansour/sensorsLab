@@ -19,9 +19,17 @@ class ComputeTrajectoryService(Node):
         self.subscription = self.create_subscription(Odometry, '/diff_drive_controller/odom', self.listener_callback,10)
         self.pose = Pose()
 
+    def close_to_wall_callback(self, scan_angle, radius):
+        warning = 0
+        scan_angle = scan_angle
+        for i in range(scan_angle-1,scan_angle+2):
+            if self.sensor.ranges[i%360]<radius:
+                warning+=1
+        return warning>=2
+
     def compute_trajectory_callback(self, request: ComputeTrajectory.Request, response: ComputeTrajectory.Response):
         #put your code here
-        response.angle = 0
+        response_angle = 0
         diff_x = request.x-self.pose.position.x
         diff_y = request.y-self.pose.position.y
         distance = sqrt((diff_x)**2 + (diff_y)**2)
@@ -29,39 +37,45 @@ class ComputeTrajectoryService(Node):
         current_direction = self.current_direction_callback()
         absolute_direction = (direction-int(self.yaw))%360
 
-        if self.sensor.ranges[absolute_direction] < distance:
+        if self.sensor.ranges[absolute_direction] < distance: #distance to goal larger than available path in goal direction
             response.step = 0
-            if self.sensor.ranges[90]<1.5:
-                response.angle = 90 #degrees
-            elif self.sensor.ranges[(-90%360)]<1.5:
-                response.angle = -90 #degrees
+            if not self.close_to_wall_callback(0,1.0):
+                response_angle=0
+            elif not self.close_to_wall_callback(90,1.0):
+                response_angle = 90 #degrees
+            elif not self.close_to_wall_callback(-90,1.0):
+                response_angle = -90 #degrees
+        elif self.close_to_wall_callback(0,1.1) and self.close_to_wall_callback(90,3.5) and self.close_to_wall_callback(-90,3.5):
+            response.step=5
+            response_angle = 0
         else:
-            if abs(diff_x)<0.5 and abs(diff_y)<0.5:
+            if abs(diff_x)<1.0 and abs(diff_y)<1.0: #arrived to goal
                 response.step=4
-                response.angle = (request.angle%360)-(self.yaw%360)
-            elif abs(diff_x)<0.5 and abs(current_direction)==2:
+                response_angle = (request.angle%360)-(self.yaw%360)
+            elif abs(diff_x)<1.0:
                 response.step = 2
-                if diff_x>0:
-                    response.angle = -90*sign(current_direction)#degrees
-                else:
-                    response.angle = 90*sign(current_direction)#degrees    
-            elif abs(diff_y)<0.5 and abs(current_direction)==1:
+                if diff_y>=0 and abs(current_direction)==1:
+                    response_angle = int(90*sign(current_direction))#degrees
+                elif diff_y<0 and abs(current_direction)==1:
+                    response_angle = -90*sign(current_direction)#degrees    
+            elif abs(diff_y)<1.0:
                 response.step = 3
-                if diff_y>0:
-                    response.angle= 90*sign(current_direction)#degrees
-                else:
-                    response.angle = -90*sign(current_direction)#degrees
+                if diff_x>=0 and abs(current_direction)==2:
+                    response_angle= -90*sign(current_direction)#degrees
+                elif diff_x<0 and abs(current_direction)==2:
+                    response_angle = 90*sign(current_direction)#degrees
             else:
                 response.step = 1
-                if self.sensor.ranges[0]>1.5:
-                    response.angle = 0 #degrees
-                if self.sensor.ranges[90]>1.5:
-                    response.angle = 90 #degrees
-                elif self.sensor.ranges[(-90%360)]>1.5:
-                    response.angle = -90 #degrees        
+                if not self.close_to_wall_callback(0,1.1):
+                    response_angle = 0 #degrees
+                if not self.close_to_wall_callback(90,3.0):
+                    response_angle = 90 #degrees
+                elif not self.close_to_wall_callback(-90,3.0):
+                    response_angle = -90 #degrees        
 
-        response.angle = response.angle%360
-        self.get_logger().debug(f'direction= {response.angle}, step= {response.step}')
+        response.angle = int(response_angle%360)
+        self.get_logger().info(f'called, diff_x = {diff_x}, diff_y = {diff_y}, direction')
+        self.get_logger().info(f'direction= {response.angle}, step= {response.step}')
         return response
     
     def current_direction_callback(self):
@@ -72,7 +86,7 @@ class ComputeTrajectoryService(Node):
             direction = -1 #negative x
         elif 80<self.yaw<100:
             direction = 2 #positive y
-        elif -100<self.yaw<-70:
+        elif -100<self.yaw<-80:
             direction = -2 #negative y 
         return direction          
 
@@ -82,11 +96,11 @@ class ComputeTrajectoryService(Node):
         quat = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w]
         _,_,self.yaw = tf_transformations.euler_from_quaternion(quat)
         self.yaw = degrees(self.yaw)
-        self.get_logger().info(f'I heard position ({self.pose.position.x},{self.pose.position.y})', throttle_duration_sec = 1.5)
+        self.get_logger().info(f'I heard position ({self.pose.position.x},{self.pose.position.y}), yaw = {self.yaw}', throttle_duration_sec = 1.5)
         
     def sensor_listener_callback(self,msg:LaserScan):
         self.sensor= msg
-        self.get_logger().info(f"I heard: dist(0)={self.sensor.ranges[0]}, dist(90)={self.sensor.ranges[90]}, dist(-90)={self.sensor.ranges[(-90%360)]}",throttle_duration_sec=1)
+        #self.get_logger().info(f"I heard: dist(0)={self.sensor.ranges[0]}, dist(90)={self.sensor.ranges[90]}, dist(-90)={self.sensor.ranges[(-90%360)]}",throttle_duration_sec=1)
 
 
 

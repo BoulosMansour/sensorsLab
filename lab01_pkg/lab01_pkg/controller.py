@@ -27,6 +27,7 @@ class Controller(Node):
         timer_period = 1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.N = 1
+        self.get_logger().info(f'N= {self.N}')
         self.counter=0
         self.output = Twist()
         self.direction =1
@@ -50,6 +51,7 @@ class Controller(Node):
         if self.counter == self.N:
             if self.direction==0:
                 self.N +=1
+                self.get_logger().info(f'N= {self.N}')
             self.counter = 0
             self.direction = (self.direction+1)%4
         self.changeDirection()
@@ -58,8 +60,8 @@ class Controller(Node):
         msg = Twist()
         msg = self.output
         self.publisher_.publish(msg)
-        #self.get_logger().info(f'Publishing: X = {msg.linear.x} Y = {msg.linear.y}')
-        self.get_logger().debug(f'Publishing: X = {msg.linear.x} Y = {msg.linear.y}')
+        self.get_logger().info(f'Publishing: v_x = {msg.linear.x} v_y = {msg.linear.y}')
+        #self.get_logger().debug(f'Publishing: v_x = {msg.linear.x} v_y = {msg.linear.y}')
 
 def main(args=None):
     rclpy.init(args=args)

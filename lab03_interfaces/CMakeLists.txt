@@ -15,7 +15,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ComputeTrajectory.srv"
-  "action/MoveDistance.action"
+  "srv/StartTrajectory.srv"
   "action/MoveForward.action"
   "action/RotateAbsolute.action"
 )

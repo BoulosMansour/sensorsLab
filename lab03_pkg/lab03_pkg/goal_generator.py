@@ -10,7 +10,7 @@ from rclpy.action import ActionClient
 from math import degrees
 
 from action_msgs.msg import GoalStatus
-from lab03_interfaces.srv import ComputeTrajectory
+from lab03_interfaces.srv import ComputeTrajectory, StartTrajectory
 from lab03_interfaces.action import MoveForward, RotateAbsolute
 
 import asyncio
@@ -22,6 +22,7 @@ class GoalGeneratorActionClient(Node):
 
         # Create a Service client instance
         self.compute_traj_cli = self.create_client(ComputeTrajectory, "compute_trajectory")
+        self.start_traj_cli = self.create_client(StartTrajectory,"start_trajectory")
         # Create an ActionClient instance
         self.rotate_absolute_client = ActionClient(self, RotateAbsolute, "rotate_absolute")
         self.move_forward_client = ActionClient(self, MoveForward, "move_forward")
@@ -104,21 +105,18 @@ async def run(args, loop):
     ################################################################################################
     # YOUR CODE SECTION STARTS HERE
     ################################################################################################
-    goal = [6.5, 2.5, 90]
+    goals = [[6.5, 2.5, 90],[0.0,0.0,0]]
+    for goal in goals:
 
-    goal_generator.get_logger().info("Sending goal: " + str(goal))
+        goal_generator.get_logger().info("Sending goal: " + str(goal))
 
-    # Example of calling a SERVICE using async/await
-    goal_generator.compute_traj_cli.wait_for_service()
-    request = ComputeTrajectory.Request()
-    request.x = goal[0]
-    request.y = goal[1]
-    request.angle = goal[2]
-    future = goal_generator.compute_traj_cli.call_async(request)
-    response = await future
-    goal_generator.get_logger().info(f'step: {response.step} response_angle: {response.angle} degrees')
+        # Example of calling a SERVICE using async/await
+        goal_generator.start_traj_cli.wait_for_service()
+        request = StartTrajectory.Request()
+        future = goal_generator.start_traj_cli.call_async(request)
+        response = await future
+        goal_generator.get_logger().info(f'response_angle: {response.angle} degrees')
 
-    while response.step<5:
         goal_direction = RotateAbsolute.Goal()
         goal_direction.angle = response.angle
         rotate_result, rotate_status = await loop.create_task(
@@ -126,18 +124,6 @@ async def run(args, loop):
                 goal_generator.rotate_absolute_client,
                 goal_direction,
                 goal_generator.rotate_absolute_get_feedback,
-            )
-        )
-
-        goal_position = MoveForward.Goal()
-        goal_position.x = goal[0]
-        goal_position.y = goal[1]
-        goal_position.step = response.step
-        move_result, move_status = await loop.create_task(
-            goal_generator.send_goal(
-                goal_generator.move_forward_client,
-                goal_position,
-                goal_generator.move_forward_get_feedback,    
             )
         )
 
@@ -149,17 +135,49 @@ async def run(args, loop):
         future = goal_generator.compute_traj_cli.call_async(request)
         response = await future
         goal_generator.get_logger().info(f'step: {response.step} response_angle: {response.angle} degrees')
-            
-    # Example of calling the rotate absolute ACTION SERVER using async/await
-    goal_angle = RotateAbsolute.Goal()
-    goal_angle.angle = response.angle
-    result, status = await loop.create_task(
-            goal_generator.send_goal(
-                goal_generator.rotate_absolute_client,
-                goal_angle,
-                goal_generator.rotate_absolute_get_feedback,
+
+        while response.step<4:
+            goal_direction = RotateAbsolute.Goal()
+            goal_direction.angle = response.angle
+            rotate_result, rotate_status = await loop.create_task(
+                goal_generator.send_goal(
+                    goal_generator.rotate_absolute_client,
+                    goal_direction,
+                    goal_generator.rotate_absolute_get_feedback,
+                )
             )
-    )
+
+            goal_position = MoveForward.Goal()
+            goal_position.x = goal[0]
+            goal_position.y = goal[1]
+            goal_position.step = response.step
+            move_result, move_status = await loop.create_task(
+                goal_generator.send_goal(
+                    goal_generator.move_forward_client,
+                    goal_position,
+                    goal_generator.move_forward_get_feedback,    
+                )
+            )
+
+            goal_generator.compute_traj_cli.wait_for_service()
+            request = ComputeTrajectory.Request()
+            request.x = goal[0]
+            request.y = goal[1]
+            request.angle = goal[2]
+            future = goal_generator.compute_traj_cli.call_async(request)
+            response = await future
+            goal_generator.get_logger().info(f'step: {response.step} response_angle: {response.angle} degrees')
+                
+        # Example of calling the rotate absolute ACTION SERVER using async/await
+        goal_angle = RotateAbsolute.Goal()
+        goal_angle.angle = response.angle
+        result, status = await loop.create_task(
+                goal_generator.send_goal(
+                    goal_generator.rotate_absolute_client,
+                    goal_angle,
+                    goal_generator.rotate_absolute_get_feedback,
+                )
+        )
         
     goal_generator.get_logger().info("All goals completed! Shutting down...")
     spin_task.cancel()

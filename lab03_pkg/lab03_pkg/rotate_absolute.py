@@ -39,7 +39,11 @@ class RotateAbsoluteActionServer(Node):
         
         self.condition = False
         self.rotate_vel = Twist()
-        publish_period = 0.1 #seconds
+
+        #parameters
+        self.angular_vel = radians(70.0)
+
+        publish_period = 0.001 #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
 
         # The action server must be in a different callback group since it is blocking.
@@ -73,7 +77,7 @@ class RotateAbsoluteActionServer(Node):
     def yaw_callback(self, msg: Odometry):
         quat = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w]
         _,_,self.yaw = euler_from_quaternion(quat)
-        self.yaw = degrees(self.yaw+180)%360-180
+        self.yaw = degrees(self.yaw)%360
         
 
     def execute_action_callback(self, goal_handle: ServerGoalHandle):
@@ -95,16 +99,19 @@ class RotateAbsoluteActionServer(Node):
         start_time = time.time()
         while self.condition:
             # Execute the control loop at a fixed rate
-            passed_angle = self.yaw-init_yaw
-            self.remaining_angle = abs(goal-passed_angle)
+            elapsed_time = time.time()
+            passed_angle = abs((self.yaw-init_yaw+180)%360-180)
+            self.remaining_angle = abs(abs(goal)-passed_angle)
             feedback_msg.remaining_angle = self.remaining_angle
-            if self.remaining_angle < 10:
+            if self.remaining_angle < 0.5:
                 self.rotate_vel.angular.z = 0.0
                 self.condition = False
                 self.cmd_vel_publisher.publish(self.rotate_vel) #make sure to publish vel 0 
                 end_time = time.time()
+            elif self.remaining_angle<10:
+                self.rotate_vel.angular.z = radians(15) * sign(goal)    
             else:
-                self.rotate_vel.angular.z = 1.5 * sign(goal)
+                self.rotate_vel.angular.z = self.angular_vel * sign(goal)
             goal_handle.publish_feedback(feedback_msg)
             self.control_rate.sleep()
             self.get_logger().info(f'yaw: {self.yaw}, reamining: {self.remaining_angle}, goal:{goal}, passed:{passed_angle}')
