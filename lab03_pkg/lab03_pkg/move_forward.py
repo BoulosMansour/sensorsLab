@@ -20,6 +20,10 @@ class MoveForwardActionServer(Node):
     def __init__(self):
         super().__init__("move_forward_action_server")
 
+        #parameters
+        self.declare_parameter('max_linear_vel', 0.22)
+        self.declare_parameter('control_loop_frequency',20)
+
         # CALLBACK GROUPS
         # Define a new callback group for the action server.
         # The action server will be assigned to this group, while the subscribers, publishers and
@@ -33,17 +37,16 @@ class MoveForwardActionServer(Node):
         #
         # You can also assign them explicitely to a MutuallyExclusiveCallbackGroup if you want to by
         # passing the callback_group argument.
-        self.pose_subscriber = self.create_subscription(Odometry, "diff_drive_controller/odom", self.pose_callback, 10, callback_group=self.topic_group)
+        self.pose_subscriber = self.create_subscription(Odometry, '/diff_drive_controller/odom', self.pose_callback, 10, callback_group=self.topic_group)
         self.laser_scan_subscriber = self.create_subscription(LaserScan,"scan", self.scan_callback,10,callback_group=self.topic_group)
         self.cmd_vel_publisher = self.create_publisher(Twist, "cmd_vel", 10, callback_group=self.topic_group)
         
         self.vel = Twist()
         self.condition = False
 
-        #parameters
-        self.linear_vel = 0.22
+        self.linear_vel = self.get_parameter('max_linear_vel').value
 
-        publish_period = 0.01 #seconds
+        publish_period = 1/(5*self.get_parameter('control_loop_frequency').value) #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
 
         # The action server must be in a different callback group since it is blocking.
@@ -60,7 +63,7 @@ class MoveForwardActionServer(Node):
         )
 
         # This rate object is used to sleep the control loop at a fixed rate in the action server callback
-        control_rate_hz = 20.0
+        control_rate_hz = self.get_parameter('control_loop_frequency').value
         self.control_rate = self.create_rate(control_rate_hz)
 
         self.get_logger().info(
@@ -105,7 +108,6 @@ class MoveForwardActionServer(Node):
         goal = goal_handle.request
         self.vel.linear.x = self.linear_vel
         self.get_logger().info(f'step: {goal.step}')
-        start_time = time.time()
         self.condition=True
         while self.condition:
             # Execute the control loop at a fixed rate
@@ -132,12 +134,6 @@ class MoveForwardActionServer(Node):
 
         # Notify the action client that the goal has been completed
         goal_handle.succeed()
-        end_time = time.time()
-
-
-        #result.elapsed_time_s = end_time - start_time
-        #result.traveled_distance = result.elapsed_time_s * 0.5
-        
         return result
 
 

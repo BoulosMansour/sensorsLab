@@ -1,0 +1,9 @@
+teleop_turtle:
+    ros__parameters:
+      scale_angular: 3.0
+      scale_linear: 0.3
+
+turtle1:
+  move_distance_action_server:
+      ros__parameters:
+        max_vel: 1.0

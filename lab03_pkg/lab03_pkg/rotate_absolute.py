@@ -21,6 +21,10 @@ class RotateAbsoluteActionServer(Node):
     def __init__(self):
         super().__init__("rotate_absolute_action_server")
 
+        #parameters
+        self.declare_parameter('max_angular_vel',60)
+        self.declare_parameter('control_loop_frequency', 200)
+
         # CALLBACK GROUPS
         # Define a new callback group for the action server.
         # The action server will be assigned to this group, while the subscribers, publishers and
@@ -34,16 +38,15 @@ class RotateAbsoluteActionServer(Node):
         #
         # You can also assign them explicitely to a MutuallyExclusiveCallbackGroup if you want to by
         # passing the callback_group argument.
-        self.yaw_subscriber = self.create_subscription(Odometry, "/diff_drive_controller/odom", self.yaw_callback, 10, callback_group=self.topic_group)
+        self.yaw_subscriber = self.create_subscription(Odometry, '/diff_drive_controller/odom', self.yaw_callback, 10, callback_group=self.topic_group)
         self.cmd_vel_publisher = self.create_publisher(Twist, "cmd_vel", 10, callback_group=self.topic_group)
         
         self.condition = False
         self.rotate_vel = Twist()
 
-        #parameters
-        self.angular_vel = radians(70.0)
+        self.angular_vel = radians(self.get_parameter('max_angular_vel').value)
 
-        publish_period = 0.001 #seconds
+        publish_period = 1/(5*self.get_parameter('control_loop_frequency').value) #seconds
         self.timer = self.create_timer(publish_period, self.pub_velocity_callback)
 
         # The action server must be in a different callback group since it is blocking.
@@ -60,7 +63,7 @@ class RotateAbsoluteActionServer(Node):
         )
 
         # This rate object is used to sleep the control loop at a fixed rate in the action server callback
-        control_rate_hz = 200.0
+        control_rate_hz = self.get_parameter('control_loop_frequency').value
         self.control_rate = self.create_rate(control_rate_hz)
 
         self.get_logger().info(
@@ -103,13 +106,13 @@ class RotateAbsoluteActionServer(Node):
             passed_angle = abs((self.yaw-init_yaw+180)%360-180)
             self.remaining_angle = abs(abs(goal)-passed_angle)
             feedback_msg.remaining_angle = self.remaining_angle
-            if self.remaining_angle < 0.5:
+            if self.remaining_angle < 1.0:
                 self.rotate_vel.angular.z = 0.0
                 self.condition = False
                 self.cmd_vel_publisher.publish(self.rotate_vel) #make sure to publish vel 0 
                 end_time = time.time()
             elif self.remaining_angle<10:
-                self.rotate_vel.angular.z = radians(15) * sign(goal)    
+                self.rotate_vel.angular.z = radians(10) * sign(goal)    
             else:
                 self.rotate_vel.angular.z = self.angular_vel * sign(goal)
             goal_handle.publish_feedback(feedback_msg)
@@ -121,7 +124,6 @@ class RotateAbsoluteActionServer(Node):
         goal_handle.succeed()
 
         result.elapsed_time_s = end_time - start_time
-        #result.traveled_distance = result.elapsed_time_s * 0.5
 
         return result
 

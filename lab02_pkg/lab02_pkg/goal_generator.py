@@ -105,8 +105,8 @@ async def run(args, loop):
     ################################################################################################
     # YOUR CODE SECTION STARTS HERE
     ################################################################################################
-    for i in range(20):   
-        goal = [random()*11, random()*11, random()*6.28]
+    for i in range(2):   
+        goal = [random()*10, random()*10, random()*6.28]
         completed_move = False
 
         goal_generator.get_logger().info("Sending goal: " + str(goal))

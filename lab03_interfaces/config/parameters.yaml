@@ -1,0 +1,9 @@
+move_forward:
+  ros__parameters:
+    max_linear_vel: 0.22
+    control_loop_frequency: 20
+
+rotate_absolute:
+  ros__parameters:
+    max_angular_velocity: 60
+    control_loop_frequency: 200

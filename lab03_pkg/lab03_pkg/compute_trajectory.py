@@ -14,6 +14,7 @@ class ComputeTrajectoryService(Node):
 
     def __init__(self):
         super().__init__('compute_trajectory')
+
         self.srv = self.create_service(ComputeTrajectory, 'compute_trajectory', self.compute_trajectory_callback)
         self.sensor_subscriber = self.create_subscription(LaserScan, '/scan', self.sensor_listener_callback, 10)
         self.subscription = self.create_subscription(Odometry, '/diff_drive_controller/odom', self.listener_callback,10)
@@ -45,7 +46,7 @@ class ComputeTrajectoryService(Node):
                 response_angle = 90 #degrees
             elif not self.close_to_wall_callback(-90,1.0):
                 response_angle = -90 #degrees
-        elif self.close_to_wall_callback(0,1.1) and self.close_to_wall_callback(90,3.5) and self.close_to_wall_callback(-90,3.5):
+        elif self.close_to_wall_callback(0,1.0) and self.close_to_wall_callback(90,2.0) and self.close_to_wall_callback(-90,2.0):
             response.step=5
             response_angle = 0
         else:
@@ -71,13 +72,21 @@ class ComputeTrajectoryService(Node):
                 if not self.close_to_wall_callback(90,3.0):
                     response_angle = 90 #degrees
                 elif not self.close_to_wall_callback(-90,3.0):
-                    response_angle = -90 #degrees        
+                    response_angle = -90 #degrees      
 
+        response_angle = response_angle-self.rectify_angle()
         response.angle = int(response_angle%360)
-        self.get_logger().info(f'called, diff_x = {diff_x}, diff_y = {diff_y}, direction')
+        self.get_logger().info(f'called, diff_x = {diff_x}, diff_y = {diff_y})')
         self.get_logger().info(f'direction= {response.angle}, step= {response.step}')
         return response
     
+    def rectify_angle(self):
+        rect = self.yaw%90
+        if rect>45:
+            rect -= 90
+        return rect
+        
+
     def current_direction_callback(self):
         direction = 1
         if abs(self.yaw)<10:

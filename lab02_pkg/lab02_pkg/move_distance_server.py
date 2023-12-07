@@ -34,6 +34,10 @@ class MoveDistanceActionServer(Node):
         self.pose_subscriber = self.create_subscription(Pose, "pose", self.pose_callback, 10, callback_group=self.topic_group)
         self.cmd_vel_publisher = self.create_publisher(Twist, "cmd_vel", 10, callback_group=self.topic_group)
 
+        #parameters
+        self.declare_parameter('max_vel',0.5)
+
+        self.max_vel = self.get_parameter('max_vel').value
         self.vel = Twist()
         self.publish = False
         self.pose = Pose()
@@ -100,9 +104,10 @@ class MoveDistanceActionServer(Node):
             if self.remaining_distance < 0.3:
                 self.vel.linear.x = 0.0
                 condition = False
+                self.publish = False
                 end_time = time.time()
             else:
-                self.vel.linear.x = 0.5
+                self.vel.linear.x = self.max_vel
             goal_handle.publish_feedback(feedback_msg)
             self.control_rate.sleep()
 
