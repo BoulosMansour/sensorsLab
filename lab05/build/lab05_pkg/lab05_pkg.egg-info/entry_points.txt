@@ -1,3 +1,0 @@
-[console_scripts]
-recorder = lab05_pkg.recorder:main
-
