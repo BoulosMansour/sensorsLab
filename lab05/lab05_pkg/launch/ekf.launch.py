@@ -26,6 +26,11 @@ def generate_launch_description():
 
     config = PathJoinSubstitution([FindPackageShare("lab05_pkg"), "config", "ekf.yaml"])
 
+    recorder=Node(
+        package='lab05_pkg',
+        executable='recorder',
+        output='screen'
+    )
     ekf = Node(
         package="robot_localization",
         executable="ekf_node",
@@ -38,6 +43,7 @@ def generate_launch_description():
     play_bag = ExecuteProcess(
         cmd=["ros2", "bag", "play", bag],
         output="screen",
+        prefix=['xterm -e'],
         condition=IfCondition(PythonExpression(["not '", bag, "' == ", "''"])),
     )
 
@@ -51,4 +57,4 @@ def generate_launch_description():
         )
     )
 
-    return LaunchDescription([bag_arg, play_bag, start_filter_after_rosbag, shutdown_on_bag_finish])
+    return LaunchDescription([bag_arg, play_bag, start_filter_after_rosbag, shutdown_on_bag_finish,recorder])

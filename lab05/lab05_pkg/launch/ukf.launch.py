@@ -26,9 +26,14 @@ def generate_launch_description():
 
     config = PathJoinSubstitution([FindPackageShare("lab05_pkg"), "config", "ekf.yaml"])
 
-    ekf = Node(
+    recorder=Node(
+        package='lab05_pkg',
+        executable='recorder',
+        output='screen'
+    )
+    ukf = Node(
         package="robot_localization",
-        executable="ekf_node",
+        executable="ukf_node",
         name="filter",
         output="screen",
         parameters=[config],
@@ -38,6 +43,7 @@ def generate_launch_description():
     play_bag = ExecuteProcess(
         cmd=["ros2", "bag", "play", bag],
         output="screen",
+        prefix=['xterm -e'],
         condition=IfCondition(PythonExpression(["not '", bag, "' == ", "''"])),
     )
 
@@ -47,8 +53,8 @@ def generate_launch_description():
 
     start_filter_after_rosbag = RegisterEventHandler(
         event_handler=OnProcessStart(
-            target_action=play_bag, on_start=[TimerAction(period=2.0, actions=[ekf])]
+            target_action=play_bag, on_start=[TimerAction(period=2.0, actions=[ukf])]
         )
     )
 
-    return LaunchDescription([bag_arg, play_bag, start_filter_after_rosbag, shutdown_on_bag_finish])
+    return LaunchDescription([bag_arg, play_bag, start_filter_after_rosbag, shutdown_on_bag_finish, recorder])
