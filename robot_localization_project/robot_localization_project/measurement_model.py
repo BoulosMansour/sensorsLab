@@ -25,7 +25,7 @@ def z_landmark(x, lmark, std_rng=0.5, max_range= 8.0, fov_deg= 45, std_brg=0.5, 
     # filter z for a more realistic sensor simulation (add a max range distance and a FOV)
     fov = np.deg2rad(fov_deg)
     if z[0, 0] < max_range and abs(z[1, 0])<fov:
-        return z + np.array([[randn() * std_rng**2, randn() * std_brg]]).T
+        return z + np.array([[randn() * std_rng**2, randn() * np.deg2rad(std_brg)]]).T
         
     return None
 

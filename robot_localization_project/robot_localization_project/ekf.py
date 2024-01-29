@@ -70,7 +70,7 @@ class RobotEKF:
 
         # Evaluate the expected measurement and compute the residual, then update the state prediction
         z_hat = self.eval_hx(m_x=lmark[0], m_y = lmark[1], x = mu[0], y= mu[1], theta = mu[2]).astype('float64')
-        self.y = (residual(z, z_hat)).astype('float64')
+        self.y = (z - z_hat).astype('float64')
         self.mu = (self.mu + (self.K @ self.y)).astype('float64')
         self.mu[2][0]=((self.mu[2][0] + np.pi) % (2*np.pi)) - np.pi
 

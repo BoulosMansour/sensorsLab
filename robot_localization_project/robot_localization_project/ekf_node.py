@@ -28,9 +28,9 @@ class EKF_node(Node):
     def __init__(self):
         super().__init__('ekf_node')
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
-        self.create_subscription(Odometry, 'ground_truth', self.ground_odom_listener_callback, 10)
-        self.create_subscription(Odometry, 'diff_drive_controller/odom', self.diff_odom_listener_callback, 10)
-        self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_listener_callback, 10)
+        self.create_subscription(Odometry, '/ground_truth', self.ground_odom_listener_callback, 10)
+        self.create_subscription(Odometry, '/diff_drive_controller/odom', self.diff_odom_listener_callback, 10)
+        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_listener_callback, 10)
         self.publisher_vel = self.create_publisher(Odometry, 'ekf_vel', 10)
         self.publisher_odom = self.create_publisher(Odometry, 'ekf_odom', 10)
         publish_period = 1.0  # seconds
@@ -83,6 +83,10 @@ class EKF_node(Node):
         self.ekf_vel = RobotEKF(self.mu, self.Sigma, self.Mt_vel, self.Qt, 3, self.eval_gux, self.eval_Gt, self.eval_Vt, self.eval_hx, self.eval_Ht, self.eval_gux_w_zero, self.eval_Gt_w_zero, self.eval_Vt_w_zero)
 
         #store data init
+        self.ekf_vel_Sigma_prediction_data = []
+        self.ekf_vel_Sigma_correction_data = []
+        self.ekf_odom_Sigma_prediction_data = []
+        self.ekf_odom_Sigma_correction_data = []
         self.odom_data = []
         self.ekf_vel_data = []
         self.ekf_odom_data = []
@@ -95,16 +99,22 @@ class EKF_node(Node):
         odom_init.pose.pose.orientation.y = quat[1]
         odom_init.pose.pose.orientation.z = quat[2]
         odom_init.pose.pose.orientation.w = quat[3]
+
+        self.ekf_odom_save_sigma_prediction = self.Sigma
+        self.ekf_odom_save_sigma_correction = self.Sigma
+        self.ekf_vel_save_sigma_prediction = self.Sigma
+        self.ekf_vel_save_sigma_correction = self.Sigma
+
         self.ekf_vel_save = odom_init
         self.ekf_odom_save = odom_init
         self.odom_data_save = Odometry()
         self.ground_truth_save = Odometry()
-        store_data_period = 0.1
-        self.create_timer(store_data_period, self.store)
+        self.store_data_period = 0.1
+        self.create_timer(self.store_data_period, self.store)
 
     def store(self):
         if self.start_ekf_vel and self.start_ground_truth and self.start_ekf_odom and self.start_diff_odom and self.start_cmd_vel:
-            self.store_data(self.ekf_odom_save, self.ekf_vel_save, self.odom_data_save, self.ground_truth_save)
+            self.store_data(self.odom_data_save, self.ekf_vel_save, self.ekf_odom_save, self.ground_truth_save, self.ekf_odom_save_sigma_prediction, self.ekf_odom_save_sigma_correction, self.ekf_vel_save_sigma_prediction, self.ekf_vel_save_sigma_correction)
 
     def cmd_vel_listener_callback(self, msg: Twist):
         self.start_cmd_vel = True
@@ -203,21 +213,26 @@ class EKF_node(Node):
             u = get_odometry_input(self.odom_pose, self.odom_pose_prev).flatten().astype('float64') 
             self.odom_pose_prev = self.odom_pose.copy()
             self.ekf_odom.predict(u = u.flatten())
+            self.ekf_odom_save_sigma_prediction = self.ekf_odom.Sigma.copy()
             for lmark in self.landmarks:
                 z = z_landmark(self.ground_pose, lmark, self.max_range, self.fov_deg, self.std_range, self.std_bearing, self.eval_hx)
                 if z is not None:
                     self.ekf_odom.update(z, lmark, residual=residual)
+                    self.get_logger().info('updateddddddddddddddddddddddddddd')
+            self.ekf_odom_save_sigma_correction = self.ekf_odom.Sigma.copy()
 
     def ekf_filter_vel(self):
         if self.start_cmd_vel and self.start_diff_odom and self.start_ground_truth:
             self.ekf_vel.predict(u = self.odom_vel.flatten(), g_extra_args=(self.ekf_period_s))
             #self.ekf_vel.predict(u = self.cmd_vel.flatten(), g_extra_args=(self.ekf_period_s))
+            self.ekf_vel_save_sigma_prediction = self.ekf_vel.Sigma.copy()
             for lmark in self.landmarks:
                 z = z_landmark(self.ground_pose, lmark, self.max_range, self.fov_deg, self.std_range, self.std_bearing, self.eval_hx)
                 if z is not None:
                     self.ekf_vel.update(z, lmark, residual=residual)
+            self.ekf_vel_save_sigma_correction = self.ekf_vel.Sigma.copy()
 
-    def store_data(self, odom: Odometry, ekf_vel: Odometry, ekf_odom: Odometry, ground_truth: Odometry):
+    def store_data(self, odom: Odometry, ekf_vel: Odometry, ekf_odom: Odometry, ground_truth: Odometry, ekf_odom_Sigma_prediction, ekf_odom_Sigma_correction, ekf_vel_Sigma_prediction, ekf_vel_Sigma_correction):
         quat_odom = [odom.pose.pose.orientation.x,odom.pose.pose.orientation.y,odom.pose.pose.orientation.z,odom.pose.pose.orientation.w]
         _,_,odom_yaw = euler_from_quaternion(quat_odom)
         odom_x = odom.pose.pose.position.x
@@ -239,6 +254,10 @@ class EKF_node(Node):
         ground_y = ground_truth.pose.pose.position.y
 
         # Store data for later analysis
+        self.ekf_vel_Sigma_prediction_data.append(ekf_vel_Sigma_prediction)
+        self.ekf_vel_Sigma_correction_data.append(ekf_vel_Sigma_correction)
+        self.ekf_odom_Sigma_prediction_data.append(ekf_odom_Sigma_prediction)
+        self.ekf_odom_Sigma_correction_data.append(ekf_odom_Sigma_correction)
         self.odom_data.append([odom_x, odom_y, odom_yaw])
         self.ekf_vel_data.append([ekf_vel_x, ekf_vel_y, ekf_vel_yaw])
         self.ekf_odom_data.append([ekf_odom_x, ekf_odom_y, ekf_odom_yaw])
@@ -248,7 +267,11 @@ class EKF_node(Node):
         np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/odom.npy", self.odom_data, allow_pickle=True)
         np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_vel.npy", self.ekf_vel_data, allow_pickle=True)
         np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_odom.npy", self.ekf_odom_data, allow_pickle=True)
-        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ground_truth.npy", self.ground_truth_data, allow_pickle=True)        
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ground_truth.npy", self.ground_truth_data, allow_pickle=True)   
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_vel_Sigma_prediction.npy", self.ekf_vel_Sigma_prediction_data, allow_pickle=True)
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_vel_Sigma_correction.npy", self.ekf_vel_Sigma_correction_data, allow_pickle=True)
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_odom_Sigma_prediction.npy", self.ekf_odom_Sigma_prediction_data, allow_pickle=True)
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/ekf_odom_Sigma_correction.npy", self.ekf_odom_Sigma_correction_data, allow_pickle=True)        
 
 def main(args=None):
 
@@ -259,7 +282,7 @@ def main(args=None):
         rclpy.spin(ekf_node)
     except KeyboardInterrupt:
         sim_time = time.time() - sim_start
-        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/sim_prop.npy",[sim_time, ekf_node.ekf_period_s], allow_pickle=True)
+        np.save("/workspaces/vscode_ros2_workspace/src/robot_localization_project/saved_data/sim_prop.npy",[sim_time, ekf_node.ekf_period_s, ekf_node.store_data_period], allow_pickle=True)
         ekf_node.save_data()
         ekf_node.get_logger().info('saved successfully')
     finally:
