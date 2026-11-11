@@ -1,6 +1,6 @@
 # Sensors and robot localization in ROS 2
 
-Coursework from the robotics sensors labs at Politecnico di Torino, written in Python with ROS 2. The main piece is an **Extended Kalman Filter** that localizes a differential-drive robot from landmark measurements.
+Coursework from the robotics sensors labs at Politecnico di Torino, written in Python with ROS 2 together with my lab partner [xkcdhg](https://github.com/xkcdhg). The main piece is an **Extended Kalman Filter** that localizes a differential-drive robot from landmark measurements.
 
 ## Robot localization project (`robot_localization_project/`)
 
